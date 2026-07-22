@@ -45,6 +45,10 @@ class MainActivity : AppCompatActivity() {
             updateToggleButtonText()
         }
 
+        findViewById<Button>(R.id.btnViewArchives).setOnClickListener {
+            startActivity(Intent(this, ArchivesActivity::class.java))
+        }
+
         findViewById<Button>(R.id.btnClearLog).setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle(R.string.clear_log_confirm_title)
@@ -62,6 +66,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        dbHelper.archiveEntriesBeforeCurrentWeek()
         refreshLogs()
         updateToggleButtonText()
     }

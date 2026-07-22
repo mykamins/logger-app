@@ -44,6 +44,18 @@ class MonitorAccessibilityService : AccessibilityService() {
         dbHelper = DbHelper(applicationContext)
         // Warm up the blocklist on a background-ish path (still fast: HashSet build from a text file).
         BlocklistLoader.load(applicationContext)
+        scheduleArchiveCheck()
+    }
+
+    private fun scheduleArchiveCheck() {
+        val archiveCheckInterval = 6 * 60 * 60 * 1000L // every 6 hours is enough to catch Monday morning promptly
+        val runnable = object : Runnable {
+            override fun run() {
+                dbHelper.archiveEntriesBeforeCurrentWeek()
+                handler.postDelayed(this, archiveCheckInterval)
+            }
+        }
+        handler.post(runnable)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {

@@ -10,4 +10,5 @@
     <string name="clear_log_confirm_message">This will permanently delete every session entry. This cannot be undone.</string>
     <string name="clear">Clear</string>
     <string name="cancel">Cancel</string>
+    <string name="view_archives">View Weekly Archives</string>
 </resources>

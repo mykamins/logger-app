@@ -17,6 +17,16 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ArchivesActivity"
+            android:exported="false"
+            android:label="Weekly Archives" />
+
+        <activity
+            android:name=".ArchiveDetailActivity"
+            android:exported="false"
+            android:label="Archived Week" />
+
         <service
             android:name=".MonitorAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
