@@ -3,6 +3,8 @@ package com.meir.logger
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
 import android.util.Patterns
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -15,6 +17,14 @@ class MonitorAccessibilityService : AccessibilityService() {
     private var sessionActive = false
     private var sessionStartTime = 0L
     private var sessionLabel = ""
+
+    // Short grace period: a page reload or ad overlay can make the address bar
+    // briefly unreadable. Rather than treating that blink as "you left the site"
+    // and closing/reopening a new session, we wait a moment to see if the same
+    // site reappears before actually ending the session.
+    private val handler = Handler(Looper.getMainLooper())
+    private var pendingEndRunnable: Runnable? = null
+    private val gracePeriodMs = 2500L
 
     // Known address-bar view IDs for common Android browsers.
     private val urlBarIds = mapOf(
@@ -40,6 +50,7 @@ class MonitorAccessibilityService : AccessibilityService() {
         if (event == null) return
         if (!prefs.getBoolean(Constants.KEY_MONITORING_ENABLED, false)) {
             // Monitoring paused by the user; make sure no stale session lingers.
+            cancelPendingEnd()
             if (sessionActive) endSession()
             return
         }
@@ -48,6 +59,7 @@ class MonitorAccessibilityService : AccessibilityService() {
         val matchedLabel = resolveMatch(packageName)
 
         if (matchedLabel != null) {
+            cancelPendingEnd()
             if (!sessionActive) {
                 startSession(matchedLabel)
             } else if (matchedLabel != sessionLabel) {
@@ -56,8 +68,23 @@ class MonitorAccessibilityService : AccessibilityService() {
                 startSession(matchedLabel)
             }
         } else {
-            if (sessionActive) endSession()
+            if (sessionActive) schedulePendingEnd()
         }
+    }
+
+    private fun schedulePendingEnd() {
+        if (pendingEndRunnable != null) return
+        val runnable = Runnable {
+            pendingEndRunnable = null
+            endSession()
+        }
+        pendingEndRunnable = runnable
+        handler.postDelayed(runnable, gracePeriodMs)
+    }
+
+    private fun cancelPendingEnd() {
+        pendingEndRunnable?.let { handler.removeCallbacks(it) }
+        pendingEndRunnable = null
     }
 
     private fun resolveMatch(packageName: String): String? {
@@ -117,6 +144,7 @@ class MonitorAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        cancelPendingEnd()
         if (sessionActive) endSession()
     }
 }
