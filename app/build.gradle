@@ -13,11 +13,22 @@ android {
         versionName "1.0"
     }
 
+    signingConfigs {
+        debug {
+            storeFile file("logger-debug.keystore")
+            storePassword "loggerpass"
+            keyAlias "loggerkey"
+            keyPassword "loggerpass"
+        }
+    }
+
     buildTypes {
         debug {
+            signingConfig signingConfigs.debug
             minifyEnabled false
         }
         release {
+            signingConfig signingConfigs.debug
             minifyEnabled false
         }
     }
