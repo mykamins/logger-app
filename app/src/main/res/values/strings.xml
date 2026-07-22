@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Logger</string>
+    <string name="accessibility_service_description">Watches which screens are open so Logger can record session times.</string>
+    <string name="enable_access">Enable Screen Access</string>
+    <string name="start_monitoring">Start Monitoring</string>
+    <string name="stop_monitoring">Stop Monitoring</string>
+    <string name="no_logs">No sessions logged yet.</string>
+</resources>
