@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
-import android.util.Patterns
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -18,13 +17,7 @@ class MonitorAccessibilityService : AccessibilityService() {
     private var sessionStartTime = 0L
     private var sessionLabel = ""
 
-    // Short grace period: a page reload or ad overlay can make the address bar
-    // briefly unreadable. Rather than treating that blink as "you left the site"
-    // and closing/reopening a new session, we wait a moment to see if the same
-    // site reappears before actually ending the session.
     private val handler = Handler(Looper.getMainLooper())
-    private var pendingEndRunnable: Runnable? = null
-    private val gracePeriodMs = 2500L
 
     // Known address-bar view IDs for common Android browsers.
     private val urlBarIds = mapOf(
@@ -38,11 +31,23 @@ class MonitorAccessibilityService : AccessibilityService() {
         "com.duckduckgo.mobile.android" to "com.duckduckgo.mobile.android:id/omnibarTextInput"
     )
 
+    /**
+     * Result of checking the current screen inside a browser.
+     * - Matched: address bar is readable and shows a blocklisted site
+     * - Unmatched: address bar is readable and shows a site NOT on the blocklist (confirmed navigation away)
+     * - Unreadable: address bar text isn't available right now (common during scrolling or full-screen video) —
+     *   this is NOT treated as proof of leaving.
+     */
+    private sealed class UrlCheckResult {
+        data class Matched(val host: String) : UrlCheckResult()
+        object Unmatched : UrlCheckResult()
+        object Unreadable : UrlCheckResult()
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         prefs = getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE)
         dbHelper = DbHelper(applicationContext)
-        // Warm up the blocklist on a background-ish path (still fast: HashSet build from a text file).
         BlocklistLoader.load(applicationContext)
         scheduleArchiveCheck()
     }
@@ -61,57 +66,50 @@ class MonitorAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         if (!prefs.getBoolean(Constants.KEY_MONITORING_ENABLED, false)) {
-            // Monitoring paused by the user; make sure no stale session lingers.
-            cancelPendingEnd()
             if (sessionActive) endSession()
             return
         }
 
         val packageName = event.packageName?.toString() ?: return
-        val matchedLabel = resolveMatch(packageName)
-
-        if (matchedLabel != null) {
-            cancelPendingEnd()
-            if (!sessionActive) {
-                startSession(matchedLabel)
-            } else if (matchedLabel != sessionLabel) {
-                // Moved from one matching site/app to a different one: close old, open new.
-                endSession()
-                startSession(matchedLabel)
-            }
-        } else {
-            if (sessionActive) schedulePendingEnd()
-        }
-    }
-
-    private fun schedulePendingEnd() {
-        if (pendingEndRunnable != null) return
-        val runnable = Runnable {
-            pendingEndRunnable = null
-            endSession()
-        }
-        pendingEndRunnable = runnable
-        handler.postDelayed(runnable, gracePeriodMs)
-    }
-
-    private fun cancelPendingEnd() {
-        pendingEndRunnable?.let { handler.removeCallbacks(it) }
-        pendingEndRunnable = null
-    }
-
-    private fun resolveMatch(packageName: String): String? {
         val urlBarId = urlBarIds[packageName]
-        if (urlBarId != null) {
-            val url = extractUrlFromBrowser(urlBarId)
-            if (url != null) {
-                val host = extractHost(url)
-                if (host != null && BlocklistLoader.matches(applicationContext, host)) {
-                    return host
+
+        if (urlBarId == null) {
+            // Foreground app is not a recognized browser at all — a real, unambiguous
+            // departure (home screen, another app, etc.).
+            if (sessionActive) endSession()
+            return
+        }
+
+        when (val result = checkBrowserUrl(urlBarId)) {
+            is UrlCheckResult.Matched -> {
+                if (!sessionActive) {
+                    startSession(result.host)
+                } else if (result.host != sessionLabel) {
+                    // Confirmed move from one matching site to a different one.
+                    endSession()
+                    startSession(result.host)
                 }
             }
-            return null
+            is UrlCheckResult.Unmatched -> {
+                // Address bar is readable and clearly shows a non-matching site: real navigation away.
+                if (sessionActive) endSession()
+            }
+            is UrlCheckResult.Unreadable -> {
+                // Address bar is hidden (scrolling, full-screen video, page still loading, etc.).
+                // We're still inside the same browser app, so we don't have proof anything changed.
+                // Leave any active session running as-is.
+            }
         }
-        return null
+    }
+
+    private fun checkBrowserUrl(viewId: String): UrlCheckResult {
+        val url = extractUrlFromBrowser(viewId) ?: return UrlCheckResult.Unreadable
+        val host = extractHost(url) ?: return UrlCheckResult.Unreadable
+        return if (BlocklistLoader.matches(applicationContext, host)) {
+            UrlCheckResult.Matched(host)
+        } else {
+            UrlCheckResult.Unmatched
+        }
     }
 
     private fun extractUrlFromBrowser(viewId: String): String? {
@@ -156,7 +154,6 @@ class MonitorAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        cancelPendingEnd()
         if (sessionActive) endSession()
     }
 }
