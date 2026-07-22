@@ -73,4 +73,8 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_V
         }
         return list
     }
+
+    fun clearAll() {
+        writableDatabase.delete(TABLE_SESSIONS, null, null)
+    }
 }

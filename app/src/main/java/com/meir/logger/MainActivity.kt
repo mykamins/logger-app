@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -42,6 +43,18 @@ class MainActivity : AppCompatActivity() {
             val currentlyEnabled = prefs.getBoolean(Constants.KEY_MONITORING_ENABLED, false)
             prefs.edit().putBoolean(Constants.KEY_MONITORING_ENABLED, !currentlyEnabled).apply()
             updateToggleButtonText()
+        }
+
+        findViewById<Button>(R.id.btnClearLog).setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.clear_log_confirm_title)
+                .setMessage(R.string.clear_log_confirm_message)
+                .setPositiveButton(R.string.clear) { _, _ ->
+                    dbHelper.clearAll()
+                    refreshLogs()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
         }
 
         updateToggleButtonText()

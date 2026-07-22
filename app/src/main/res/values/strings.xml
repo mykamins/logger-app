@@ -5,4 +5,9 @@
     <string name="start_monitoring">Start Monitoring</string>
     <string name="stop_monitoring">Stop Monitoring</string>
     <string name="no_logs">No sessions logged yet.</string>
+    <string name="clear_log">Clear Log</string>
+    <string name="clear_log_confirm_title">Clear all logged sessions?</string>
+    <string name="clear_log_confirm_message">This will permanently delete every session entry. This cannot be undone.</string>
+    <string name="clear">Clear</string>
+    <string name="cancel">Cancel</string>
 </resources>
