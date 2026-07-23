@@ -105,8 +105,9 @@ class MonitorAccessibilityService : AccessibilityService() {
     private fun checkBrowserUrl(viewId: String): UrlCheckResult {
         val url = extractUrlFromBrowser(viewId) ?: return UrlCheckResult.Unreadable
         val host = extractHost(url) ?: return UrlCheckResult.Unreadable
-        return if (BlocklistLoader.matches(applicationContext, host)) {
-            UrlCheckResult.Matched(host)
+        val canonical = BlocklistLoader.matchedDomain(applicationContext, host)
+        return if (canonical != null) {
+            UrlCheckResult.Matched(canonical)
         } else {
             UrlCheckResult.Unmatched
         }
@@ -128,12 +129,18 @@ class MonitorAccessibilityService : AccessibilityService() {
     private fun extractHost(text: String): String? {
         var candidate = text.trim()
         if (candidate.isEmpty()) return null
+        // Guard against page titles, "Loading…" placeholders, or search suggestions
+        // sometimes shown in the address bar area — these aren't real URLs and
+        // shouldn't be treated as proof of navigating to a different site.
+        if (candidate.contains(" ")) return null
+        if (!candidate.contains(".")) return null
         if (!candidate.contains("://")) {
             candidate = "http://$candidate"
         }
         return try {
             val uri = android.net.Uri.parse(candidate)
-            uri.host
+            val host = uri.host
+            if (host.isNullOrBlank() || !host.contains(".")) null else host
         } catch (e: Exception) {
             null
         }

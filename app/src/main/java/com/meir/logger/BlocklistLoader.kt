@@ -37,15 +37,26 @@ object BlocklistLoader {
      * checking both the exact host and its parent domains.
      */
     fun matches(context: Context, host: String): Boolean {
-        if (host.isBlank()) return false
+        return matchedDomain(context, host) != null
+    }
+
+    /**
+     * Returns the actual blocklist entry that matched (e.g. "pornhub.com"), regardless of
+     * which subdomain variant ("m.pornhub.com", "il.pornhub.com", "www.pornhub.com", etc.)
+     * was in the address bar. Returns null if nothing matched. Callers should use this
+     * canonical value — rather than the raw host — as the session label, so a session
+     * isn't wrongly treated as "changed sites" just because the subdomain shifted.
+     */
+    fun matchedDomain(context: Context, host: String): String? {
+        if (host.isBlank()) return null
         val set = load(context)
         var candidate = host.lowercase().removePrefix("www.")
         while (true) {
-            if (set.contains(candidate)) return true
+            if (set.contains(candidate)) return candidate
             val dotIndex = candidate.indexOf('.')
             if (dotIndex == -1 || dotIndex == candidate.length - 1) break
             candidate = candidate.substring(dotIndex + 1)
         }
-        return false
+        return null
     }
 }
