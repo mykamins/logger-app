@@ -87,14 +87,47 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_V
     }
 
     fun insertSession(startTime: Long, endTime: Long, label: String) {
-        val durationSeconds = (endTime - startTime) / 1000
-        val values = ContentValues().apply {
-            put("start_time", startTime)
-            put("end_time", endTime)
-            put("duration_seconds", durationSeconds)
-            put("label", label)
+        val db = writableDatabase
+        val mergeWindowMs = 60_000L
+
+        // If the previous entry ended within the merge window of this one starting,
+        // treat it as the same continuous visit: stretch the existing entry's end
+        // time instead of adding a new row. This keeps the log accurate even if
+        // detection briefly stumbles mid-visit (any live-detection quirk still
+        // gets absorbed here rather than showing up as a pile of tiny entries).
+        val cursor = db.query(
+            TABLE_SESSIONS, null, null, null, null, null,
+            "start_time DESC", "1"
+        )
+        var mergedIntoId: Long? = null
+        cursor.use {
+            if (it.moveToFirst()) {
+                val prevId = it.getLong(it.getColumnIndexOrThrow("id"))
+                val prevEnd = it.getLong(it.getColumnIndexOrThrow("end_time"))
+                val prevStart = it.getLong(it.getColumnIndexOrThrow("start_time"))
+                if (startTime - prevEnd in 0..mergeWindowMs) {
+                    val newDuration = (endTime - prevStart) / 1000
+                    val values = ContentValues().apply {
+                        put("end_time", endTime)
+                        put("duration_seconds", newDuration)
+                        put("label", label)
+                    }
+                    db.update(TABLE_SESSIONS, values, "id = ?", arrayOf(prevId.toString()))
+                    mergedIntoId = prevId
+                }
+            }
         }
-        writableDatabase.insert(TABLE_SESSIONS, null, values)
+
+        if (mergedIntoId == null) {
+            val durationSeconds = (endTime - startTime) / 1000
+            val values = ContentValues().apply {
+                put("start_time", startTime)
+                put("end_time", endTime)
+                put("duration_seconds", durationSeconds)
+                put("label", label)
+            }
+            db.insert(TABLE_SESSIONS, null, values)
+        }
     }
 
     fun getAllSessions(): List<SessionEntry> {

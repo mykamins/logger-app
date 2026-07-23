@@ -34,7 +34,7 @@ class LogsAdapter(private var items: List<SessionEntry>) :
         val seconds = entry.durationSeconds % 60
         val durationText = if (minutes > 0) "${minutes}m ${seconds}s" else "${seconds}s"
 
-        holder.txtDetail.text = "${timeFormat.format(startDate)} · $durationText · ${entry.label}"
+        holder.txtDetail.text = "${timeFormat.format(startDate)} · $durationText"
     }
 
     override fun getItemCount(): Int = items.size

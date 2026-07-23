@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Bold, blocky "L" monogram, centered in the adaptive-icon safe zone -->
+    <path
+        android:fillColor="#ECEFF4"
+        android:pathData="M32,30 L45,30 L45,66 L76,66 L76,79 L32,79 Z" />
+
+    <!-- Small accent dot, echoing the app's accent blue -->
+    <path
+        android:fillColor="#5E81AC"
+        android:pathData="M56,42 A7,7 0 1,0 70,42 A7,7 0 1,0 56,42 Z" />
+</vector>
